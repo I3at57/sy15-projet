@@ -13,6 +13,7 @@
 
 /* Variables globales */
 int X0=1; // Pour U(A,B)
+int init=0; // Pour vérifier que les paramètres sont initialisé
 
 // Le stock maximal de Prod 1 est de 64
 // Donc il peut au maximum y avoir 64 commandes de 1 produit
@@ -45,9 +46,11 @@ void start_display()
 		"\n#   SY15: Projet de simulation   #"
 		"\n#                                #"
 		"\n# 1. Lancer la simulation        #"
-		"\n# 2. Voir parametres simulation  #"
-	 	"\n# 3. Voir les commandes          #"
-	 	"\n# 4. Quitter                     #"
+		"\n# 2. Initialiser la simulation   #"
+		"\n# 3. Modifier parametres         #"
+		"\n# 4. Voir parametres simulation  #"
+	 	"\n# 5. Voir les commandes          #"
+	 	"\n# 6. Quitter                     #"
 		"\n#                                #"
 		"\n##################################"
 
@@ -105,32 +108,61 @@ void initialiser_commandes()
 	NBR_PRODUITS = total;
 }
 
+void simulation(int verbatim)
+{
+	// L'option verbatim = 1 permet d'afficher
+	// les étapes de simulation
+	printf("\n  ~~~ Debut de la simulation ~~~  ");
+
+	commandes_prod1 = NBR_COMMANDES;
+	commandes_warehouse = 0;
+	commandes_client2 = 0;
+
+	while (commandes_client2 < NBR_COMMANDES)
+	{
+		//
+	}
+}
+
+/* Main */
 int main()
 {
 	/*
 	 * Quatres choix de simulations
 	 * 1. Lancer la simulation
-	 * 2. Voir les paramètres de simulation
-	 * 3. Voir les commandes à t=0;
-	 * 4. Quitter
+	 * 2. Initialiser la simulation
+	 * 3. Changer parametres de simulation
+	 * 4. Voir les paramètres de simulation
+	 * 5. Voir les commandes à t=0;
+	 * 6. Quitter
 	 */
-	initialiser_commandes();
-	int choix = 5;
+	int choix = -1;
 	int wait;
 	start_display();
-	while (choix != 4)
+	while (choix != 6)
 	{
 		scanf("%d", &choix);
 		fflush(stdin);
 		start_display();
 		if (choix == 1)
 		{
-			// R
+			if (init==0)
+			{
+				printf("\n/!\\ Simulation non initialise /!\\\n");
+			} else {
+				simulation();
+			}
 		} else if (choix == 2) {
+			printf("\nSimulation initialise !");
+			initialiser_commandes();
+			init = 1;
+		} else if (choix == 3) {
+			// R
+		} else if (choix == 4) {
 			afficher_parametres_simu();
 			fflush(stdin);
 			scanf(">>%d", &wait);
-		} else if (choix == 3) {
+		} else if (choix == 5) {
 			afficher_commandes();	
 			fflush(stdin);
 			scanf(">>%d", &wait);
