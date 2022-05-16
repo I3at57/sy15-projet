@@ -114,9 +114,9 @@ void simulation(int verbatim)
 	// les étapes de simulation
 	printf("\n  ~~~ Debut de la simulation ~~~  ");
 
-	commandes_prod1 = NBR_COMMANDES;
-	commandes_warehouse = 0;
-	commandes_client2 = 0;
+	int commandes_prod1 = NBR_COMMANDES;
+	int commandes_warehouse = 0;
+	int commandes_client2 = 0;
 
 	while (commandes_client2 < NBR_COMMANDES)
 	{
@@ -150,7 +150,7 @@ int main()
 			{
 				printf("\n/!\\ Simulation non initialise /!\\\n");
 			} else {
-				simulation();
+				//R
 			}
 		} else if (choix == 2) {
 			printf("\nSimulation initialise !");
