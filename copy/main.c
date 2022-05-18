@@ -15,7 +15,7 @@
 #define STOCK_MAX_PROD1 64
 #define STOCK_MAX_WAREHOUSE 64
 #define STOCK_MAX_CLIENT2 64
-#define HORIZON 86400
+#define HORIZON 1200
 
 // Variables globales //
 /**************************************************************/
@@ -52,7 +52,7 @@ int Stock[3];
 // 0: Prod1, 1: Warehouse, 2: Client2
 
 int NBR_EVENT;
-float Tab[4][3];
+float Tab[4][2];
 // L'échéancier:
 // Evenement
 // date
@@ -169,12 +169,23 @@ void initialisation()
 
 void ajouter(int event, float date, int agv, int lieu)
 {
-	Tab[0][NBR_EVENT] = event;
-	Tab[1][NBR_EVENT] = date;
-	Tab[2][NBR_EVENT] = agv;
-	Tab[3][NBR_EVENT] = lieu;
-
-	NBR_EVENT++;
+	if (date > Tab[1][0]) {
+		Tab[0][1] = event;
+		Tab[1][1] = date;
+		Tab[2][1] = agv;
+		Tab[3][1] = lieu;
+	} else {
+		Tab[0][1] = Tab[0][0];
+		Tab[1][1] = Tab[1][0];
+		Tab[2][1] = Tab[2][0];
+		Tab[3][1] = Tab[3][0];
+		
+		Tab[0][0] = event;
+		Tab[1][0] = date;
+		Tab[2][0] = agv;
+		Tab[3][0] = lieu;
+		NBR_EVENT++;
+	}
 }
 
 // Évènements //
@@ -189,6 +200,7 @@ void fin_chargement(int agv)
 		{
 			Files_FIFO[0][i]=Files_FIFO[0][i+1];
 		}
+		Stock[0]--;
 		State[0][0] = 3;
 		ajouter(3, t+N(LAW[0][2][0], LAW[0][2][2]), 1, 2);
 	} else {
@@ -197,6 +209,7 @@ void fin_chargement(int agv)
 		{
 			Files_FIFO[1][i] = Files_FIFO[1][i+1];
 		}
+		Stock[1]--;
 		State[1][0]=3;
 		ajouter(3, t+N(LAW[1][2][0], LAW[1][2][1]), 2, 3);
 		if (State[0][0] == 0 && State[0][1] != 0) {
@@ -210,6 +223,7 @@ void fin_dechargement(int agv)
 {
 	if (agv == 1) {
 		Files_FIFO[1][Stock[1]]=State[0][1];
+		Stock[1]++;
 		State[0][1]=0;
 		State[0][0]=3;
 		ajouter(3, t+N(LAW[0][2][0], LAW[0][2][1]), 1, 1);
@@ -219,6 +233,7 @@ void fin_dechargement(int agv)
 		}
 	} else {
 		Files_FIFO[2][Stock[2]]=State[1][1];
+		Stock[2]++;
 		State[1][1]=0;
 		State[1][0]=3;
 		ajouter(3, t+N(LAW[1][2][0], LAW[1][2][1]), 2, 2);
@@ -231,21 +246,22 @@ void fin_deplacement(int agv, int lieu)
 		if (lieu == 1) {
 			if (Stock[0] >= 1) {
 				State[0][0]=2;
-				ajouter(2, t+N(LAW[0][1][0], LAW[0][1][1]), 1, 0);
+				ajouter(1, t+N(LAW[0][1][0], LAW[0][1][1]), 1, 0);
 			} else {
 				State[0][0]=0;
+				ajouter(1, 2*H, 1, 1);
 			}
 		} else {
 			if (State[1][0]==2) {
 				State[0][0]=0;
 			} else {
 				State[0][0]=1;
-				ajouter(1, t+N(LAW[0][0][0], LAW[0][0][1]), 1, 0);
+				ajouter(2, t+N(LAW[0][0][0], LAW[0][0][1]), 1, 0);
 			}
 		}
 	} else {
 		if (lieu == 2) {
-			if (lieu == 2) {
+			if (State[0][0]==2) {
 				State[1][0]=0;
 			} else {
 				if (Stock[1]>=1) {
@@ -272,31 +288,59 @@ void show_commandes()
 	}
 }
 
-void show_state()
-{
-	printf("Temps courant: %f\n", t);
-	printf("Prochain evenement: %d, avec AGV %d en %d\n", Tab[0][0], Tab[2][0], Tab[3][0]);
-
-	printf("\nEtat de AGV1: %d, %d\n", State[0][0], State[0][1]);
-	printf("\nEtat de AGV2: %d, %d\n", State[1][0], State[1][1]);
-
-	printf("\nNbr commandes Prod1: %d\n", Stock[0]);
-	printf("\nNbr commandes Warehouse: %d\n", Stock[1]);
-	printf("\nNbr commandes Client2: %d\n", Stock[2]);
-}
-
 void show_echeancier()
 {
 	int i, j;
 	printf("\n");
 	for (i=0; i<4; i++)
 	{
-		for (j=0; j<3; j++)
+		for (j=0; j<2; j++)
 		{
 			printf("%f ", Tab[i][j]);
 		}
 		printf("\n");
 	}
+}
+
+void show_state()
+{
+	//printf("Temps courant: %f\n", t);
+	printf("Prochain evenement:\n");
+	if (Tab[0][0]==3.0)
+	{
+		printf("Fin de deplacement");
+	} else if (Tab[0][0]==2.0) {
+		printf("Fin de dechargement");
+	} else {
+		printf("Fin chargement");
+	}
+	printf("\n");
+	printf("A la date: %f", Tab[1][0]);
+	printf("\n");
+	printf("Avec AGV: %f", Tab[2][0]);
+	printf("\n");
+	printf("En: \n");
+	if (Tab[3][0]==1.0)
+	{
+		printf("Prod1");
+	} else if (Tab[3][0]==2.0) {
+		printf("Warehouse");
+	} else if (Tab[3][0]==3.0) {
+		printf("Client 2");
+	} else {
+		printf("---\n");
+	}
+	printf("\n");
+
+	printf("Etat de AGV1: %d, %d\n", State[0][0], State[0][1]);
+	printf("Etat de AGV2: %d, %d\n", State[1][0], State[1][1]);
+
+	printf("Nbr commandes Prod1: %d\n", Stock[0]);
+	printf("Nbr commandes Warehouse: %d\n", Stock[1]);
+	printf("Nbr commandes Client2: %d\n", Stock[2]);
+
+	printf("Etat de l'echeancier: \n");
+	show_echeancier();
 }
 
 // Algorithme principale //
@@ -312,15 +356,14 @@ void algo_principal(int verbose)
 		agv = Tab[2][0];
 		lieu = Tab[3][0];
 		if (verbose == 1) { // Affiches l'état du système
+			printf("\n--- Nouveau cycle --- \n");
 			show_state();
 		}
-		for (i=0; i<4; i++) // Supprime l'évenement traité
+		for (j=0; j<4; j++) // Supprime l'évenement
 		{
-			for (j=0; j<2; i++)
-			{
-				Tab[i][j] = Tab[i][j+1];
-			}
+			Tab[j][0] = Tab[j][1];
 		}
+		NBR_EVENT--;
 		if (ev == 1) // Sélectionne l'évènement
 		{
 			fin_chargement(agv);
@@ -328,7 +371,7 @@ void algo_principal(int verbose)
 			fin_dechargement(agv);
 		} else {
 			fin_deplacement(agv, lieu);
-		}	
+		}
 	}
 }
 
