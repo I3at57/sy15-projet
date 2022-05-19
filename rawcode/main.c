@@ -49,7 +49,7 @@ int Stock[3];
 // 0: Prod1, 1: Warehouse, 2: Client2
 
 int NBR_EVENT;
-float Tab[4][TAILLE_ECHEANCIER];
+float Tab[4][TAILLE_ECHEANCIER] = {0};
 // L'échéancier:
 // Evenement
 // date
@@ -110,61 +110,50 @@ float N(float M, float O)
 /**************************************************************/
 void ajouter(int event, float date, int agv, int lieu)
 {
-	// Trouver la position
-	// Décaler
-	// Insérer
-	if (date > Tab[1][0])
-	{
-		Tab[0][1] = event;
-		Tab[1][1] = date;
-		Tab[2][1] = agv;
-		Tab[3][1] = lieu;
-	}
-	else
-	{
-		Tab[0][1] = Tab[0][0];
-		Tab[1][1] = Tab[1][0];
-		Tab[2][1] = Tab[2][0];
-		Tab[3][1] = Tab[3][0];
-
+	if (NBR_EVENT==0) {
 		Tab[0][0] = event;
 		Tab[1][0] = date;
 		Tab[2][0] = agv;
 		Tab[3][0] = lieu;
-		NBR_EVENT++;
-	}
-
-	/*
-	int pos=0;
-	while (Tab[1][pos] < date)
-	{
-		pos++;
-	}
-	for (int i=0; i<3; i++)
-	{
-		for (int j=NBR_EVENT; j>pos; j--)
+	} else {
+		//Recherche de position
+		int pos = 0;
+		while (Tab[1][pos] < date && Tab[0][pos] != 0)
 		{
-			Tab[i][j]=Tab[i][j-1];
+			pos++;
 		}
-	}
-	Tab[0][pos] = event;
-	Tab[1][pos] = date;
-	Tab[2][pos] = agv;
-	Tab[3][pos] = lieu;
 
+		// décalage
+		for (int i = 0; i < 4; i++)
+		{
+			for (int j = TAILLE_ECHEANCIER-1; j > pos; j--)
+			{
+				Tab[i][j] = Tab[i][j - 1];
+			}
+		}
+
+		// Insertion
+		Tab[0][pos] = event;
+		Tab[1][pos] = date;
+		Tab[2][pos] = agv;
+		Tab[3][pos] = lieu;
+	}
 	NBR_EVENT++;
-	*/
 }
 
 void deletion()
 {
-	for (int i = 0; i < NBR_EVENT; i++)
+	for (int i=0; i<4; i++)
 	{
-		for (int j = 0; j < 3; j++)
+		for (int j=0; j<TAILLE_ECHEANCIER-1; j++)
 		{
-			Tab[j][i] = Tab[j][i + 1];
+			Tab[i][j]=Tab[i][j+1];
 		}
 	}
+	Tab[0][TAILLE_ECHEANCIER-1]=0;
+	Tab[1][TAILLE_ECHEANCIER - 1] = 0;
+	Tab[2][TAILLE_ECHEANCIER - 1] = 0;
+	Tab[3][TAILLE_ECHEANCIER - 1] = 0;
 	NBR_EVENT--;
 }
 
@@ -210,12 +199,7 @@ void initialisation()
 	init_commandes();
 
 	// Ajoute les initialisateurs
-	Tab[0][0] = 3;
-	Tab[1][0] = t;
-	Tab[2][0] = 1;
-	Tab[3][0] = 1;
-	NBR_EVENT = 1;
-	//ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]), 1, 1);
+	ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]), 1, 1);
 
 	State[0][0] = 0;
 	State[0][1] = 0;
@@ -333,7 +317,7 @@ void show_echeancier()
 	printf("\n");
 	for (i=0; i<4; i++)
 	{
-		for (j=0; j<2; j++)
+		for (j=0; j<TAILLE_ECHEANCIER; j++)
 		{
 			printf("%f ", Tab[i][j]);
 		}
@@ -384,7 +368,7 @@ void show_state()
 
 // Algorithme principale //
 /**************************************************************/
-void algo_principal(int verbose)
+int algo_principal(int verbose)
 {
 	int ev, agv, lieu, i, j;
 	initialisation();
@@ -398,15 +382,7 @@ void algo_principal(int verbose)
 			printf("\n--- Nouveau cycle --- \n");
 			show_state();
 		}
-		
-		//Version maison
-		for (j=0; j<4; j++) // Supprime l'évenement
-		{
-			Tab[j][0] = Tab[j][1];
-		}
-		
-		NBR_EVENT--;
-		//deletion();
+		deletion();
 		if (ev == 1) // Sélectionne l'évènement
 		{
 			fin_chargement(agv);
@@ -416,6 +392,7 @@ void algo_principal(int verbose)
 			fin_deplacement(agv, lieu);
 		}
 	}
+	return 1;
 }
 
 int main(int argc, char *argv[])
@@ -427,11 +404,6 @@ int main(int argc, char *argv[])
 	// i, j et k sont des compteurs de test
 
 	system("clear");
-	printf("%d\n", argc);
-	for (int k=0; k<argc; k++)
-	{
-		printf("%s\n", argv[k]);
-	}
 
 	if (argc == 1)
 	{
@@ -448,19 +420,25 @@ int main(int argc, char *argv[])
 
 	} else if (strcmp(argv[1], "-t") == 0) {
 		printf("\n --- Test ---\n\n");
-		float rea;
-		float sum=0;
-		int ite=20;
-		for (int i=0; i<ite; i++)
-		{
-			//rea = Exp(5);
-			rea = N(10, 0.1);
-			printf("%f\n", rea);	
-			sum = sum + rea;
-		}
-		printf("Moyenne: %f\n", (float) sum/ite);
+		// float rea;
+		// float sum=0;
+		// int ite=20;
+		// for (int i=0; i<ite; i++)
+		// {
+		// 	//rea = Exp(5);
+		// 	rea = N(10, 0.1);
+		// 	printf("%f\n", rea);	
+		// 	sum = sum + rea;
+		// }
+		// printf("Moyenne: %f\n", (float) sum/ite);
+		show_echeancier();
+		ajouter(1, 168, 2, 3);
+		show_echeancier();
+		ajouter(3, 15, 2, 1);
+		show_echeancier();
+		deletion();
+		show_echeancier();
 		return 0;
-
 	} else {
 		printf("Error: No matching argument found\n"); 
 		return -1;
