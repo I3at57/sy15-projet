@@ -16,17 +16,14 @@
 #define STOCK_MAX_WAREHOUSE 64
 #define STOCK_MAX_CLIENT2 64
 #define HORIZON 1200
+#define TAILLE_ECHEANCIER 3
 
 // Variables globales //
 /**************************************************************/
 
-// Variables pour les probabilités
-int X0=1;
-
 // Variables de simulations
 float t; // Temps courant
 float H; // horizons de simulation
-
 
 float LAW[2][3][2]={{{10, 0.1}, {10, 0.1}, {10, 0.1}}, {{10, 0.1}, {10, 0.1}, {10, 0.1}}};
 // Les paramètres des lois normales
@@ -52,7 +49,7 @@ int Stock[3];
 // 0: Prod1, 1: Warehouse, 2: Client2
 
 int NBR_EVENT;
-float Tab[4][2];
+float Tab[4][TAILLE_ECHEANCIER];
 // L'échéancier:
 // Evenement
 // date
@@ -76,6 +73,7 @@ int Files_FIFO[3][STOCK_MAX_PROD1];
 
 // Fonctions probabilistes //
 /**************************************************************/
+int X0=1;
 float U(float A, float B)
 {
 	// Retourne une valeur aléatoire suivant la loi
@@ -110,6 +108,66 @@ float N(float M, float O)
 
 // Fonctions Utilitaires //
 /**************************************************************/
+void ajouter(int event, float date, int agv, int lieu)
+{
+	// Trouver la position
+	// Décaler
+	// Insérer
+	if (date > Tab[1][0])
+	{
+		Tab[0][1] = event;
+		Tab[1][1] = date;
+		Tab[2][1] = agv;
+		Tab[3][1] = lieu;
+	}
+	else
+	{
+		Tab[0][1] = Tab[0][0];
+		Tab[1][1] = Tab[1][0];
+		Tab[2][1] = Tab[2][0];
+		Tab[3][1] = Tab[3][0];
+
+		Tab[0][0] = event;
+		Tab[1][0] = date;
+		Tab[2][0] = agv;
+		Tab[3][0] = lieu;
+		NBR_EVENT++;
+	}
+
+	/*
+	int pos=0;
+	while (Tab[1][pos] < date)
+	{
+		pos++;
+	}
+	for (int i=0; i<3; i++)
+	{
+		for (int j=NBR_EVENT; j>pos; j--)
+		{
+			Tab[i][j]=Tab[i][j-1];
+		}
+	}
+	Tab[0][pos] = event;
+	Tab[1][pos] = date;
+	Tab[2][pos] = agv;
+	Tab[3][pos] = lieu;
+
+	NBR_EVENT++;
+	*/
+}
+
+void deletion()
+{
+	for (int i = 0; i < NBR_EVENT; i++)
+	{
+		for (int j = 0; j < 3; j++)
+		{
+			Tab[j][i] = Tab[j][i + 1];
+		}
+	}
+	NBR_EVENT--;
+}
+
 void init_commandes()
 {
 	// L'objectif de cette fonction est de générer le tableau
@@ -146,6 +204,7 @@ void initialisation()
 	// Variables de simulation
 	t = 0;
 	H = HORIZON;
+	NBR_EVENT = 0;
 
 	// Tableau des commandes
 	init_commandes();
@@ -156,6 +215,7 @@ void initialisation()
 	Tab[2][0] = 1;
 	Tab[3][0] = 1;
 	NBR_EVENT = 1;
+	//ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]), 1, 1);
 
 	State[0][0] = 0;
 	State[0][1] = 0;
@@ -165,27 +225,6 @@ void initialisation()
 	Stock[0] = NBR_COMMANDES;
 	Stock[1] = 0;
 	Stock[2] = 0;
-}
-
-void ajouter(int event, float date, int agv, int lieu)
-{
-	if (date > Tab[1][0]) {
-		Tab[0][1] = event;
-		Tab[1][1] = date;
-		Tab[2][1] = agv;
-		Tab[3][1] = lieu;
-	} else {
-		Tab[0][1] = Tab[0][0];
-		Tab[1][1] = Tab[1][0];
-		Tab[2][1] = Tab[2][0];
-		Tab[3][1] = Tab[3][0];
-		
-		Tab[0][0] = event;
-		Tab[1][0] = date;
-		Tab[2][0] = agv;
-		Tab[3][0] = lieu;
-		NBR_EVENT++;
-	}
 }
 
 // Évènements //
@@ -359,11 +398,15 @@ void algo_principal(int verbose)
 			printf("\n--- Nouveau cycle --- \n");
 			show_state();
 		}
+		
+		//Version maison
 		for (j=0; j<4; j++) // Supprime l'évenement
 		{
 			Tab[j][0] = Tab[j][1];
 		}
+		
 		NBR_EVENT--;
+		//deletion();
 		if (ev == 1) // Sélectionne l'évènement
 		{
 			fin_chargement(agv);
