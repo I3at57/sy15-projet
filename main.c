@@ -8,46 +8,37 @@
  * Voir le README.md pour plus d'informations
  * *************************************************************/
 
+#define TAILLE_MAX_ARRAY 500
+#define TAILLE_MAX_ECHEANCIER 10
+
 // Paramètres de simulation //
 /**************************************************************/
-#define STOCK_MAX_PROD1 64
-#define STOCK_MAX_WAREHOUSE 64
-#define STOCK_MAX_CLIENT2 64
-#define HORIZON 2000
-#define TAILLE_ECHEANCIER 2
-// En réalité on pourait utiliser 2 mais avec un
-// échéancier on peut facilement ajouter des évènements
-#define TEMPS_TRAITEMENT_AGV 7
-// Avant de commencer une opération les agvs ont un temps de
-// traitement d'environ 7 secondes à chaques fois
+typedef struct Parameters
+{ // structure des paramètres de simulation
+	int stockMaxProd1;
+	int stockMaxWarehouse;
+	int stockMaxClient2;
+	int horizon;
+	int tailleEcheancier;
+	int tempsTraitementAgv;
+	float law[2][3][2];
+} parameters;
+
+parameters simulation = {
+   	.stockMaxProd1 = 64,
+	.stockMaxWarehouse = 64,
+	.stockMaxClient2 = 64,
+	.tailleEcheancier = 3,
+	.horizon = 3600,
+	.tempsTraitementAgv = 7,
+	.law = {{{10, 0.1}, {10, 0.1}, {10, 0.1}}, {{10, 0.1}, {10, 0.1}, {10, 0.1}}}
+};
 
 /* Variables globales */
 /**************************************************************/
-// Variables de simulations
-float t; // Temps courant
-float H; // horizons de simulation
-
-// Les Loi de la simulation
-float LAW[2][3][2] = {{{10, 0.1}, {10, 0.1}, {10, 0.1}}, {{10, 0.1}, {10, 0.1}, {10, 0.1}}};
-// Les lois sont organisé comme suit:
-// AGV1
-// 		Chargement
-// 			Moyenne
-// 			Ecart-type
-// 		Déchargement
-// 			Moyenne
-// 			Ecartype
-// 		Déplacement
-// 			Moyenne
-// 			Ecartype
-// 	AGV2
-// 		...
-//
-// Par exemple pour accéder à l'écart type de l'AGV1 en déplacement
-// il faut utiliser LAW[0][2][1]
 
 // Tableau des commandes à t=0;
-int TAB_COMMANDES[STOCK_MAX_PROD1];
+int TAB_COMMANDES[TAILLE_MAX_ARRAY];
 int NBR_COMMANDES; // Nombre total de commande après génération
 int NBR_PRODUITS; // Nombre total de produit après génération
 
@@ -56,7 +47,7 @@ int Stock[3];
 // 0: Prod1, 1: Warehouse, 2: Client2
 
 int NBR_EVENT;
-float Tab[4][TAILLE_ECHEANCIER] = {0};
+float Tab[4][TAILLE_MAX_ECHEANCIER];
 // L'échéancier:
 // Evenement
 // date
@@ -78,8 +69,12 @@ int state[2][2];
 // Par exemple pour utiliser l'état actuel de AGV2 il faut utiliser
 // state[1][0]
 
-int Files_FIFO[3][STOCK_MAX_PROD1];
+int Files_FIFO[3][TAILLE_MAX_ARRAY];
 // Les commandes des files
+
+// Variables de simulations
+float t; // Temps courant
+float H; // horizons de simulation
 
 /* Fonctions de probabilités */
 /**************************************************************/
@@ -89,12 +84,12 @@ float U(float A, float B)
 	// retourne une valeur aléatoire uniformément
 	// répartie entre A et B, des réels
 	int alpha = 15;
-    int beta = 7;
-    int gamma = 15654;
+    	int beta = 7;
+    	int gamma = 15654;
 
-    X0 = (alpha*X0+beta)%(gamma);
-    float val = (float) X0/gamma;
-    return (float) val*(B-A)+A;
+    	X0 = (alpha*X0+beta)%(gamma);
+    	float val = (float) X0/gamma;
+    	return (float) val*(B-A)+A;
 }
 
 float Exp(float lambda)
@@ -144,7 +139,7 @@ void ajouter(int event, float date, int agv, int lieu)
 		// décalage
 		for (int i = 0; i < 4; i++)
 		{
-			for (int j = TAILLE_ECHEANCIER - 1; j > pos; j--)
+			for (int j = simulation.tailleEcheancier - 1; j > pos; j--)
 			{
 				Tab[i][j] = Tab[i][j - 1];
 			}
@@ -164,15 +159,15 @@ void deletion()
 	// Supprime le premier évènement de l'échéancier
 	for (int i = 0; i < 4; i++)
 	{
-		for (int j = 0; j < TAILLE_ECHEANCIER - 1; j++)
+		for (int j = 0; j < simulation.tailleEcheancier - 1; j++)
 		{
 			Tab[i][j] = Tab[i][j + 1];
 		}
 	}
-	Tab[0][TAILLE_ECHEANCIER - 1] = 0;
-	Tab[1][TAILLE_ECHEANCIER - 1] = 0;
-	Tab[2][TAILLE_ECHEANCIER - 1] = 0;
-	Tab[3][TAILLE_ECHEANCIER - 1] = 0;
+	Tab[0][simulation.tailleEcheancier - 1] = 0;
+	Tab[1][simulation.tailleEcheancier - 1] = 0;
+	Tab[2][simulation.tailleEcheancier - 1] = 0;
+	Tab[3][simulation.tailleEcheancier - 1] = 0;
 	NBR_EVENT--;
 }
 
@@ -196,7 +191,7 @@ void init_commandes()
 	int prod = (int) U(1, 7);
 	NBR_COMMANDES = 0;
 	NBR_PRODUITS = 0;
-	while (NBR_PRODUITS + prod < STOCK_MAX_PROD1)
+	while (NBR_PRODUITS + prod < simulation.stockMaxProd1)
 	{
 		TAB_COMMANDES[NBR_COMMANDES] = prod;
 		Files_FIFO[0][NBR_COMMANDES] = prod;
@@ -213,7 +208,7 @@ void initialisation()
 
 	// Variables de simulation
 	t = 0;
-	H = HORIZON;
+	H = simulation.horizon;
 	NBR_EVENT = 0;
 
 	// Tableau des commandes
@@ -221,13 +216,13 @@ void initialisation()
 
 	// Réinitialise l'écheancier
 	for (int i=0; i<4; i++) {
-		for (int j=0; j<TAILLE_ECHEANCIER; j++) {
+		for (int j=0; j<TAILLE_MAX_ECHEANCIER; j++) {
 			Tab[i][j] = 0;
 		}
 	}
 
 	// Ajoute les initialisateurs
-	ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]), 1, 1);
+	ajouter(3, t + N(simulation.law[0][2][0], simulation.law[0][2][1]), 1, 1);
 
 	state[0][0] = 0;
 	state[0][1] = 0;
@@ -253,7 +248,7 @@ void fin_chargement(int agv)
 		}
 		Stock[0]--;
 		state[0][0] = 3;
-		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][2]), 1, 2);
+		ajouter(3, t + N(simulation.law[0][2][0], simulation.law[0][2][2]), 1, 2);
 	}
 	else
 	{
@@ -264,11 +259,11 @@ void fin_chargement(int agv)
 		}
 		Stock[1]--;
 		state[1][0] = 3;
-		ajouter(3, t + N(LAW[1][2][0], LAW[1][2][1]), 2, 3);
+		ajouter(3, t + N(simulation.law[1][2][0], simulation.law[1][2][1]), 2, 3);
 		if (state[0][0] == 0 && state[0][1] != 0)
 		{
 			state[0][0] = 1;
-			ajouter(2, t + N(LAW[0][1][0] * state[0][1], LAW[0][1][1]), 1, 0);
+			ajouter(2, t + N(simulation.law[0][1][0] * state[0][1], simulation.law[0][1][1]), 1, 0);
 		}
 	}
 }
@@ -281,11 +276,11 @@ void fin_dechargement(int agv)
 		Stock[1]++;
 		state[0][1] = 0;
 		state[0][0] = 3;
-		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]), 1, 1);
+		ajouter(3, t + N(simulation.law[0][2][0], simulation.law[0][2][1]), 1, 1);
 		if (state[1][0] == 0)
 		{
 			state[1][0] = 2;
-			ajouter(1, t + N(LAW[1][0][0]*Files_FIFO[1][0], LAW[1][0][1]), 2, 0);
+			ajouter(1, t + N(simulation.law[1][0][0] * Files_FIFO[1][0], simulation.law[1][0][1]), 2, 0);
 		}
 	}
 	else
@@ -294,7 +289,7 @@ void fin_dechargement(int agv)
 		Stock[2]++;
 		state[1][1] = 0;
 		state[1][0] = 3;
-		ajouter(3, t + N(LAW[1][2][0], LAW[1][2][1]), 2, 2);
+		ajouter(3, t + N(simulation.law[1][2][0], simulation.law[1][2][1]), 2, 2);
 	}
 }
 
@@ -307,7 +302,7 @@ void fin_deplacement(int agv, int lieu)
 			if (Stock[0] >= 1)
 			{
 				state[0][0] = 2;
-				ajouter(1, t + N(LAW[0][1][0]*Files_FIFO[0][0], LAW[0][1][1]), 1, 0);
+				ajouter(1, t + N(simulation.law[0][1][0] * Files_FIFO[0][0], simulation.law[0][1][1]), 1, 0);
 			}
 			else
 			{
@@ -324,7 +319,7 @@ void fin_deplacement(int agv, int lieu)
 			else
 			{
 				state[0][0] = 1;
-				ajouter(2, t + N(LAW[0][0][0] * state[0][1], LAW[0][0][1]), 1, 0);
+				ajouter(2, t + N(simulation.law[0][0][0] * state[0][1], simulation.law[0][0][1]), 1, 0);
 			}
 		}
 	}
@@ -341,7 +336,7 @@ void fin_deplacement(int agv, int lieu)
 				if (Stock[1] >= 1)
 				{
 					state[1][0] = 2;
-					ajouter(1, t + N(LAW[1][0][0] * Files_FIFO[1][0], LAW[1][0][1]), 2, 0);
+					ajouter(1, t + N(simulation.law[1][0][0] * Files_FIFO[1][0], simulation.law[1][0][1]), 2, 0);
 				}
 				else
 				{
@@ -352,7 +347,7 @@ void fin_deplacement(int agv, int lieu)
 		else
 		{
 			state[1][0] = 1;
-			ajouter(2, t + N(LAW[1][1][0] * state[1][1], LAW[1][1][1]), 2, 0);
+			ajouter(2, t + N(simulation.law[1][1][0] * state[1][1], simulation.law[1][1][1]), 2, 0);
 		}
 	}
 }
@@ -373,7 +368,7 @@ void show_echeancier()
 	printf("\n");
 	for (i = 0; i < 4; i++)
 	{
-		for (j = 0; j < TAILLE_ECHEANCIER; j++)
+		for (j = 0; j < simulation.tailleEcheancier; j++)
 		{
 			printf("%f ", Tab[i][j]);
 		}
@@ -481,65 +476,63 @@ void afficher_parametres_simu()
 	printf("\n#                                #");
 	printf("\n##################################"); //34 #
 
-	printf("\nStock max Prod1: %d", STOCK_MAX_PROD1);
-	printf("\nStock max Client2: %d", STOCK_MAX_CLIENT2);
-	printf("\nStock max Warehouse: %d\n", STOCK_MAX_WAREHOUSE);
+	printf("\nStock max Prod1: %d", simulation.stockMaxProd1);
+	printf("\nStock max Client2: %d", simulation.stockMaxClient2);
+	printf("\nStock max Warehouse: %d\n", simulation.stockMaxWarehouse);
 
 	printf(
-		"\nParametres des AGV:\n"
-		"AGV1:\n"
-		"\tmoyenne de chargement: %.2f\n"
-		"\tecart-type de chargement: %.2f\n"
-		"\tmoyenne de dechargement: %.2f\n"
-		"\tecart-type de dechargement: %.2f\n"
-		"\tmoyenne de deplacement: %.2f\n"
-		"\tecart-type de deplacement: %.2f\n"
-		"AGV2:\n"
-		"\tmoyenne de chargement: %.2f\n"
-		"\tecart-type de chargement: %.2f\n"
-		"\tmoyenne de dechargement: %.2f\n"
-		"\tecart-type de dechargement: %.2f\n"
-		"\tmoyenne de deplacement: %.2f\n"
-		"\tecart-type de deplacement: %.2f\n",
-		LAW[0][0][0], LAW[0][0][1], LAW[0][1][0], LAW[0][1][1],
-		LAW[0][2][0], LAW[0][2][1],
-		LAW[1][0][0], LAW[1][0][1], LAW[1][1][0], LAW[1][1][1],
-		LAW[1][2][0], LAW[1][2][1]
-	);
+	    "\nParametres des AGV:\n"
+	    "AGV1:\n"
+	    "\tmoyenne de chargement (par pieces): %.2f\n"
+	    "\tecart-type de chargement (par pieces): %.2f\n"
+	    "\tmoyenne de dechargement (par pieces): %.2f\n"
+	    "\tecart-type de dechargement (par pieces): %.2f\n"
+	    "\tmoyenne de deplacement: %.2f\n"
+	    "\tecart-type de deplacement: %.2f\n"
+	    "AGV2:\n"
+	    "\tmoyenne de chargement (par pieces): %.2f\n"
+	    "\tecart-type de chargement (par pieces): %.2f\n"
+	    "\tmoyenne de dechargement (par pieces): %.2f\n"
+	    "\tecart-type de dechargement (par pieces): %.2f\n"
+	    "\tmoyenne de deplacement: %.2f\n"
+	    "\tecart-type de deplacement: %.2f\n",
+	    simulation.law[0][0][0], simulation.law[0][0][1], simulation.law[0][1][0], simulation.law[0][1][1],
+	    simulation.law[0][2][0], simulation.law[0][2][1],
+	    simulation.law[1][0][0], simulation.law[1][0][1], simulation.law[1][1][0], simulation.law[1][1][1],
+	    simulation.law[1][2][0], simulation.law[1][2][1]);
 }
 
 // Algorithme principale //
 /**************************************************************/
 int algo_principal(int verbose)
 {
-	t = 0; // reinitialise le temps pour plusieurs simulations
-	int ev, agv, lieu, i, j;
-	// initialisation();
+	int i, j;
+	int values[3] = {0, 0, 0}; // evenement, agv, lieu
 	system("clear");
 	printf("\n--- Debut de simulation ---\n\n");
 	while (t < H && Stock[2] < NBR_COMMANDES)
 	{
-		ev = Tab[0][0];
+		values[0] = Tab[0][0];
 		t = Tab[1][0];
-		agv = Tab[2][0];
-		lieu = Tab[3][0];
+		values[1] = Tab[2][0];
+		values[3] = Tab[3][0];
 		if (verbose == 1)
 		{ // Affiches l'état du système
 			printf("\n--- Nouveau cycle --- \n");
 			show_state();
 		}
 		deletion();
-		if (ev == 1) // Sélectionne l'évènement
+		if (values[0] == 1) // Sélectionne l'évènement
 		{
-			fin_chargement(agv);
+			fin_chargement(values[1]);
 		}
-		else if (ev == 2)
+		else if (values[0] == 2)
 		{
-			fin_dechargement(agv);
+			fin_dechargement(values[1]);
 		}
 		else
 		{
-			fin_deplacement(agv, lieu);
+			fin_deplacement(values[1], values[2]);
 		}
 	}
 
@@ -561,6 +554,7 @@ void menu()
 	 * 6. Voir les commandes à t=0;
 	 * 7. Quitter
 	 */
+
 	int choix = -1; // Choix du user
 	int wait; // Pour attendre la frappe
 	int init=0; // A t=0 la simu n'est pas initialise
@@ -632,7 +626,6 @@ void menu()
 int main(int argc, char *argv[])
 {
 	// Sans argument, lance la simulation classique
-	// avec '-t', lance en mode test
 	// Avec '-d' lance en mode dev
 	//
 	// i, j et k sont des compteurs de test
