@@ -14,7 +14,7 @@
 #define STOCK_MAX_WAREHOUSE 64
 #define STOCK_MAX_CLIENT2 64
 #define HORIZON 2000
-#define TAILLE_ECHEANCIER 3
+#define TAILLE_ECHEANCIER 2
 // En réalité on pourait utiliser 2 mais avec un
 // échéancier on peut facilement ajouter des évènements
 #define TEMPS_TRAITEMENT_AGV 7
@@ -268,7 +268,7 @@ void fin_chargement(int agv)
 		if (state[0][0] == 0 && state[0][1] != 0)
 		{
 			state[0][0] = 1;
-			ajouter(2, t + N(LAW[0][1][0], LAW[0][1][1]), 1, 0);
+			ajouter(2, t + N(LAW[0][1][0] * state[0][1], LAW[0][1][1]), 1, 0);
 		}
 	}
 }
@@ -285,7 +285,7 @@ void fin_dechargement(int agv)
 		if (state[1][0] == 0)
 		{
 			state[1][0] = 2;
-			ajouter(1, t + N(LAW[1][0][0], LAW[1][0][1]), 2, 0);
+			ajouter(1, t + N(LAW[1][0][0]*Files_FIFO[1][0], LAW[1][0][1]), 2, 0);
 		}
 	}
 	else
@@ -307,7 +307,7 @@ void fin_deplacement(int agv, int lieu)
 			if (Stock[0] >= 1)
 			{
 				state[0][0] = 2;
-				ajouter(1, t + N(LAW[0][1][0], LAW[0][1][1]), 1, 0);
+				ajouter(1, t + N(LAW[0][1][0]*Files_FIFO[0][0], LAW[0][1][1]), 1, 0);
 			}
 			else
 			{
@@ -324,7 +324,7 @@ void fin_deplacement(int agv, int lieu)
 			else
 			{
 				state[0][0] = 1;
-				ajouter(2, t + N(LAW[0][0][0], LAW[0][0][1]), 1, 0);
+				ajouter(2, t + N(LAW[0][0][0] * state[0][1], LAW[0][0][1]), 1, 0);
 			}
 		}
 	}
@@ -341,7 +341,7 @@ void fin_deplacement(int agv, int lieu)
 				if (Stock[1] >= 1)
 				{
 					state[1][0] = 2;
-					ajouter(1, t + N(LAW[1][0][0], LAW[1][0][1]), 2, 0);
+					ajouter(1, t + N(LAW[1][0][0] * Files_FIFO[1][0], LAW[1][0][1]), 2, 0);
 				}
 				else
 				{
@@ -352,7 +352,7 @@ void fin_deplacement(int agv, int lieu)
 		else
 		{
 			state[1][0] = 1;
-			ajouter(2, t + N(LAW[1][1][0], LAW[1][1][1]), 2, 0);
+			ajouter(2, t + N(LAW[1][1][0] * state[1][1], LAW[1][1][1]), 2, 0);
 		}
 	}
 }
