@@ -13,7 +13,7 @@
 #define STOCK_MAX_PROD1 64
 #define STOCK_MAX_WAREHOUSE 64
 #define STOCK_MAX_CLIENT2 64
-#define HORIZON 2000
+#define HORIZON 3000
 #define TAILLE_ECHEANCIER 2
 // En réalité on pourait utiliser 2 mais avec un
 // échéancier on peut facilement ajouter des évènements
@@ -56,7 +56,7 @@ int Stock[3];
 // 0: Prod1, 1: Warehouse, 2: Client2
 
 int NBR_EVENT;
-float Tab[4][TAILLE_ECHEANCIER] = {0};
+float Tab[4][TAILLE_ECHEANCIER];
 // L'échéancier:
 // Evenement
 // date
@@ -78,7 +78,9 @@ int state[2][2];
 // Par exemple pour utiliser l'état actuel de AGV2 il faut utiliser
 // state[1][0]
 
-int Files_FIFO[3][STOCK_MAX_PROD1];
+int prod1[STOCK_MAX_PROD1];
+int warehouse[STOCK_MAX_PROD1];
+int client2[STOCK_MAX_PROD1];
 // Les commandes des files
 
 /* Fonctions de probabilités */
@@ -199,7 +201,7 @@ void init_commandes()
 	while (NBR_PRODUITS + prod < STOCK_MAX_PROD1)
 	{
 		TAB_COMMANDES[NBR_COMMANDES] = prod;
-		Files_FIFO[0][NBR_COMMANDES] = prod;
+		prod1[NBR_COMMANDES] = prod;
 		NBR_COMMANDES++;
 		NBR_PRODUITS = NBR_PRODUITS + prod;
 		prod = (int) U(1, 7);
@@ -246,10 +248,10 @@ void fin_chargement(int agv)
 	int i;
 	if (agv == 1)
 	{
-		state[0][1] = Files_FIFO[0][0];
+		state[0][1] = prod1[0];
 		for (i = 0; i <= Stock[0] - 2; i++)
 		{
-			Files_FIFO[0][i] = Files_FIFO[0][i + 1];
+			prod1[i] = prod1[i + 1];
 		}
 		Stock[0]--;
 		state[0][0] = 3;
@@ -257,10 +259,10 @@ void fin_chargement(int agv)
 	}
 	else
 	{
-		state[1][1] = Files_FIFO[1][0];
+		state[1][1] = warehouse[0];
 		for (i = 0; i <= Stock[1] - 2; i++)
 		{
-			Files_FIFO[1][i] = Files_FIFO[1][i + 1];
+			warehouse[i] = warehouse[i + 1];
 		}
 		Stock[1]--;
 		state[1][0] = 3;
@@ -277,7 +279,7 @@ void fin_dechargement(int agv)
 {
 	if (agv == 1)
 	{
-		Files_FIFO[1][Stock[1]] = state[0][1];
+		warehouse[Stock[1]] = state[0][1];
 		Stock[1]++;
 		state[0][1] = 0;
 		state[0][0] = 3;
@@ -285,12 +287,12 @@ void fin_dechargement(int agv)
 		if (state[1][0] == 0)
 		{
 			state[1][0] = 2;
-			ajouter(1, t + N(LAW[1][0][0]*Files_FIFO[1][0], LAW[1][0][1]), 2, 0);
+			ajouter(1, t + N(LAW[1][0][0]*warehouse[0], LAW[1][0][1]), 2, 0);
 		}
 	}
 	else
 	{
-		Files_FIFO[2][Stock[2]] = state[1][1];
+		client2[Stock[2]] = state[1][1];
 		Stock[2]++;
 		state[1][1] = 0;
 		state[1][0] = 3;
@@ -307,7 +309,7 @@ void fin_deplacement(int agv, int lieu)
 			if (Stock[0] >= 1)
 			{
 				state[0][0] = 2;
-				ajouter(1, t + N(LAW[0][1][0]*Files_FIFO[0][0], LAW[0][1][1]), 1, 0);
+				ajouter(1, t + N(LAW[0][1][0]*client2[0], LAW[0][1][1]), 1, 0);
 			}
 			else
 			{
@@ -341,7 +343,7 @@ void fin_deplacement(int agv, int lieu)
 				if (Stock[1] >= 1)
 				{
 					state[1][0] = 2;
-					ajouter(1, t + N(LAW[1][0][0] * Files_FIFO[1][0], LAW[1][0][1]), 2, 0);
+					ajouter(1, t + N(LAW[1][0][0] * warehouse[0], LAW[1][0][1]), 2, 0);
 				}
 				else
 				{
