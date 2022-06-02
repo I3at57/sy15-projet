@@ -21,6 +21,7 @@
 // Avant de commencer une opération les agvs ont un temps de
 // traitement d'environ 7 secondes à chaques fois
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Variables globales */
 /**************************************************************/
 // Variables de simulations
@@ -83,6 +84,7 @@ int warehouse[STOCK_MAX_PROD1];
 int client2[STOCK_MAX_PROD1];
 // Les commandes des files
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Fonctions de probabilités */
 /**************************************************************/
 int X0 = 1; // Pour U(A,B)
@@ -119,6 +121,7 @@ float N(float M, float O)
 	return (float)R * O + M;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Fonctions Utilitaires //
 /**************************************************************/
 void ajouter(int event, float date, int agv, int lieu)
@@ -241,128 +244,139 @@ void initialisation()
 	Stock[2] = 0;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Évènements //
 /**************************************************************/
 void fin_chargement(int agv)
 {
 	int i;
-	if (agv == 1)
+	if (agv == 1) // L'AGV 1 finit de charger, il est en Prod1
 	{
-		state[0][1] = prod1[0];
-		for (i = 0; i <= Stock[0] - 2; i++)
+		state[0][1] = prod1[0]; // Met la charge de AGV1 à celle de de la commande chargée
+		for (i = 0; i <= Stock[0] - 2; i++) // Retire la commande de Prod1
 		{
 			prod1[i] = prod1[i + 1];
 		}
-		Stock[0]--;
-		state[0][0] = 3;
-		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][2]) + TEMPS_TRAITEMENT_AGV, 1, 2);
+		Stock[0]--; // Réduit le nombre de commande de Prod1
+		state[0][0] = 3; // Met l'AGV1 en chagement
+		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][2]), 1, 2);
+		// Ajoute une fin de déplacement de AGV1 vers Warehouse
 	}
-	else
+	else // L'AGV 2 finit de charger il est en Warehouse
 	{
-		state[1][1] = warehouse[0];
-		for (i = 0; i <= Stock[1] - 2; i++)
+		state[1][1] = warehouse[0]; // Met le chargement de AGV2 à celui de la cimmande chargée
+		for (i = 0; i <= Stock[1] - 2; i++) // Enlève la commande de Warehouse
 		{
 			warehouse[i] = warehouse[i + 1];
 		}
-		Stock[1]--;
-		state[1][0] = 3;
-		ajouter(3, t + N(LAW[1][2][0], LAW[1][2][1]) + TEMPS_TRAITEMENT_AGV, 2, 3);
-		if (state[0][0] == 0 && state[0][1] != 0)
+		Stock[1]--; // Réduit le nombre de commande de Warehouse
+		state[1][0] = 3; // AGV2 en déplacement
+		ajouter(3, t + N(LAW[1][2][0], LAW[1][2][1]), 2, 3);
+		// Ajoute un déplacement de AGV2 vers Client2
+		if (state[0][0] == 0 && state[0][1] != 0) // Vérifie si AGV1 est en attente
 		{
-			state[0][0] = 1;
+			// Si oui
+			state[0][0] = 1; // AGV1 en chargement
 			ajouter(
 					2,
 					t + N(LAW[0][1][0] * state[0][1], LAW[0][1][1])+TEMPS_TRAITEMENT_AGV,
 					1, 0
-			);
+			);	
+			// Ajoute une fin de chargmeent de AGV1
 		}
 	}
 }
 
 void fin_dechargement(int agv)
 {
-	if (agv == 1)
+	if (agv == 1) // Le déchargment concerne AGV1
 	{
-		warehouse[Stock[1]] = state[0][1];
-		Stock[1]++;
-		state[0][1] = 0;
-		state[0][0] = 3;
-		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]) + TEMPS_TRAITEMENT_AGV, 1, 1);
-		if (state[1][0] == 0)
+		warehouse[Stock[1]] = state[0][1]; // Ajoute la commande dans warehouse
+		Stock[1]++; // Augmente le nbr de commandes dans Warehouse
+		state[0][1] = 0; // Charge de AGV1 à 0
+		state[0][0] = 3; // AGV1 en déplacement
+		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]), 1, 1); // Ajoute une fin de déplacement
+		if (state[1][0] == 0) // Vérifie si AGV2 était en attente
 		{
 			state[1][0] = 2;
-			ajouter(1, t + N(LAW[1][0][0]*warehouse[0], LAW[1][0][1]), 2, 0);
+			ajouter(1, t + N(LAW[1][0][0]*warehouse[0], LAW[1][0][1]) + TEMPS_TRAITEMENT_AGV, 2, 0);
+			// Ajoute une fin de chargement de AGV2
 		}
 	}
-	else
+	else // déchargement concenre AGV2
 	{
-		client2[Stock[2]] = state[1][1];
-		Stock[2]++;
-		state[1][1] = 0;
-		state[1][0] = 3;
+		client2[Stock[2]] = state[1][1]; // Ajoute la commande à Client2
+		Stock[2]++; // Augmente le nombre de commandde dans Client 2
+		state[1][1] = 0; // Charge AGV2 à 0
+		state[1][0] = 3; // AGV2 en déplacement
 		ajouter(3, t + N(LAW[1][2][0], LAW[1][2][1]), 2, 2);
+		// Ajoute une fin de déplacement de AGV2 vers Warehouse
 	}
 }
 
 void fin_deplacement(int agv, int lieu)
 {
-	if (agv == 1)
+	if (agv == 1) // L'évènement concerne AGV1
 	{
-		if (lieu == 1)
+		if (lieu == 1) // Déplacement en Prod1
 		{
-			if (Stock[0] >= 1)
+			if (Stock[0] >= 1) // Si il y a des commandes en Prod1
 			{
 				state[0][0] = 2;
-				ajouter(1, t + N(LAW[0][1][0]*client2[0], LAW[0][1][1]), 1, 0);
+				ajouter(1, t + N(LAW[0][1][0]*client2[0], LAW[0][1][1]) + TEMPS_TRAITEMENT_AGV, 1, 0);
 			}
-			else
+			else // Sinon en attente
 			{
 				state[0][0] = 0;
 				ajouter(1, 2 * H, 1, 1);
 			}
 		}
-		else
+		else // Déplacement vers Warehouse
 		{
-			if (state[1][0] == 2)
+			if (state[1][0] == 2) // Si AGV2 décharge
 			{
-				state[0][0] = 0;
+				state[0][0] = 0; // AGV1 en attente
 			}
-			else
+			else // Sinon décharge
 			{
 				state[0][0] = 1;
-				ajouter(2, t + N(LAW[0][0][0] * state[0][1], LAW[0][0][1]), 1, 0);
+				ajouter(2, t + N(LAW[0][0][0] * state[0][1], LAW[0][0][1]) + TEMPS_TRAITEMENT_AGV, 1, 0);
 			}
 		}
 	}
-	else
+	else // Déplacement concerne AGV2
 	{
-		if (lieu == 2)
+		if (lieu == 2) // Vers Warehouse
 		{
-			if (state[0][0] == 2)
+			if (state[0][0] == 2) // si AGV1 est en déchargement
 			{
-				state[1][0] = 0;
+				state[1][0] = 0; // AGV2 en attente
 			}
 			else
 			{
-				if (Stock[1] >= 1)
+				if (Stock[1] >= 1) // Si il y a des commandes en Warehouse
 				{
+					// AGV2 en chargement
 					state[1][0] = 2;
-					ajouter(1, t + N(LAW[1][0][0] * warehouse[0], LAW[1][0][1]), 2, 0);
+					ajouter(1, t + N(LAW[1][0][0] * warehouse[0], LAW[1][0][1]) + TEMPS_TRAITEMENT_AGV, 2, 0);
 				}
 				else
 				{
+					// AGV2 en attente
 					state[1][0] = 0;
 				}
 			}
 		}
-		else
+		else // Déplacement vers Client 2
 		{
-			state[1][0] = 1;
-			ajouter(2, t + N(LAW[1][1][0] * state[1][1], LAW[1][1][1]), 2, 0);
+			// Déchargmeent de AGV2
+			state[1][0] = 1; 
+			ajouter(2, t + N(LAW[1][1][0] * state[1][1], LAW[1][1][1]) + TEMPS_TRAITEMENT_AGV, 2, 0);
 		}
 	}
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Fonctions d'affichages */
 /**************************************************************/
 void show_commandes()
@@ -514,6 +528,7 @@ void afficher_parametres_simu()
 	);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Algorithme principale //
 /**************************************************************/
 int algo_principal(int verbose)
