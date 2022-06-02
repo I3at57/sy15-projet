@@ -255,7 +255,7 @@ void fin_chargement(int agv)
 		}
 		Stock[0]--;
 		state[0][0] = 3;
-		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][2]), 1, 2);
+		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][2]) + TEMPS_TRAITEMENT_AGV, 1, 2);
 	}
 	else
 	{
@@ -266,11 +266,15 @@ void fin_chargement(int agv)
 		}
 		Stock[1]--;
 		state[1][0] = 3;
-		ajouter(3, t + N(LAW[1][2][0], LAW[1][2][1]), 2, 3);
+		ajouter(3, t + N(LAW[1][2][0], LAW[1][2][1]) + TEMPS_TRAITEMENT_AGV, 2, 3);
 		if (state[0][0] == 0 && state[0][1] != 0)
 		{
 			state[0][0] = 1;
-			ajouter(2, t + N(LAW[0][1][0] * state[0][1], LAW[0][1][1]), 1, 0);
+			ajouter(
+					2,
+					t + N(LAW[0][1][0] * state[0][1], LAW[0][1][1])+TEMPS_TRAITEMENT_AGV,
+					1, 0
+			);
 		}
 	}
 }
@@ -283,7 +287,7 @@ void fin_dechargement(int agv)
 		Stock[1]++;
 		state[0][1] = 0;
 		state[0][0] = 3;
-		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]), 1, 1);
+		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]) + TEMPS_TRAITEMENT_AGV, 1, 1);
 		if (state[1][0] == 0)
 		{
 			state[1][0] = 2;
