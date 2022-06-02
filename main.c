@@ -2,25 +2,29 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <unistd.h>
 
 /****************************************************************
  * Ce projet a pour objectif de simuler le système industriel de Sy15
  * Voir le README.md pour plus d'informations
  * *************************************************************/
-
+// Paramètres fixes
+#define TAILLE_ECHEANCIER 2
+#define MAX_ARRAY_SIZE 1000
 // Paramètres de simulation //
 /**************************************************************/
-#define STOCK_MAX_PROD1 64
-#define STOCK_MAX_WAREHOUSE 64
-#define STOCK_MAX_CLIENT2 64
-#define HORIZON 2000
-#define TAILLE_ECHEANCIER 2
+int STOCK_MAX_PROD1 = 64;
+int STOCK_MAX_WAREHOUSE = 64;
+int STOCK_MAX_CLIENT2 = 64;
+int HORIZON = 5000;
 // En réalité on pourait utiliser 2 mais avec un
 // échéancier on peut facilement ajouter des évènements
-#define TEMPS_TRAITEMENT_AGV 7
+int TEMPS_TRAITEMENT_AGV = 7;
 // Avant de commencer une opération les agvs ont un temps de
 // traitement d'environ 7 secondes à chaques fois
+int POLITIQUE_COMANDES = 0;
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Variables globales */
 /**************************************************************/
 // Variables de simulations
@@ -28,7 +32,8 @@ float t; // Temps courant
 float H; // horizons de simulation
 
 // Les Loi de la simulation
-float LAW[2][3][2] = {{{10, 0.1}, {10, 0.1}, {10, 0.1}}, {{10, 0.1}, {10, 0.1}, {10, 0.1}}};
+float LAW[2][3][2] = {
+    {{15, 1}, {15, 1}, {25, 1}}, {{15, 1}, {15, 1}, {25, 1}}};
 // Les lois sont organisé comme suit:
 // AGV1
 // 		Chargement
@@ -47,16 +52,16 @@ float LAW[2][3][2] = {{{10, 0.1}, {10, 0.1}, {10, 0.1}}, {{10, 0.1}, {10, 0.1}, 
 // il faut utiliser LAW[0][2][1]
 
 // Tableau des commandes à t=0;
-int TAB_COMMANDES[STOCK_MAX_PROD1];
-int NBR_COMMANDES; // Nombre total de commande après génération
-int NBR_PRODUITS; // Nombre total de produit après génération
+int tabCommandes[MAX_ARRAY_SIZE];
+int nbrCommandes; // Nombre total de commande après génération
+int nbrProduits; // Nombre total de produit après génération
 
 int Stock[3];
 // Donne le nombre de commandes dans chaques zones de stockage
 // 0: Prod1, 1: Warehouse, 2: Client2
 
-int NBR_EVENT;
-float Tab[4][TAILLE_ECHEANCIER] = {0};
+int nbrEvent;
+float Tab[4][TAILLE_ECHEANCIER];
 // L'échéancier:
 // Evenement
 // date
@@ -78,9 +83,12 @@ int state[2][2];
 // Par exemple pour utiliser l'état actuel de AGV2 il faut utiliser
 // state[1][0]
 
-int Files_FIFO[3][STOCK_MAX_PROD1];
+int prod1[MAX_ARRAY_SIZE];
+int warehouse[MAX_ARRAY_SIZE];
+int client2[MAX_ARRAY_SIZE];
 // Les commandes des files
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Fonctions de probabilités */
 /**************************************************************/
 int X0 = 1; // Pour U(A,B)
@@ -117,12 +125,13 @@ float N(float M, float O)
 	return (float)R * O + M;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Fonctions Utilitaires //
 /**************************************************************/
 void ajouter(int event, float date, int agv, int lieu)
 {
 	// Ajoute l'évènement dans l'échéancier
-	if (NBR_EVENT == 0)
+	if (nbrEvent == 0)
 	{
 		// L'évènement 0 n'existe que lorsque l'échéancier est
 		// initialisé, donc c'est une vérification pour les
@@ -156,7 +165,7 @@ void ajouter(int event, float date, int agv, int lieu)
 		Tab[2][pos] = agv;
 		Tab[3][pos] = lieu;
 	}
-	NBR_EVENT++;
+	nbrEvent++;
 }
 
 void deletion()
@@ -173,13 +182,13 @@ void deletion()
 	Tab[1][TAILLE_ECHEANCIER - 1] = 0;
 	Tab[2][TAILLE_ECHEANCIER - 1] = 0;
 	Tab[3][TAILLE_ECHEANCIER - 1] = 0;
-	NBR_EVENT--;
+	nbrEvent--;
 }
 
 void init_commandes()
 {
 	// L'objectif de cette fonction est de générer le tableau
-	// de commandes TAB_COMMANDES.
+	// de commandes tabCommandes.
 	// Ce tableau est un vecteur remplit avec le nombre de
 	// commandes et le nombre de produit en FIFO
 	// Le nombre max de produits et 64.
@@ -192,17 +201,49 @@ void init_commandes()
 		U(0, 1);
 	}
 
-	int compt = 0;
+	// int compt = 0;
 	int prod = (int) U(1, 7);
-	NBR_COMMANDES = 0;
-	NBR_PRODUITS = 0;
-	while (NBR_PRODUITS + prod < STOCK_MAX_PROD1)
+	int pos, save;
+	nbrCommandes = 0;
+	nbrProduits = 0;
+	while (nbrProduits + prod < STOCK_MAX_PROD1)
 	{
-		TAB_COMMANDES[NBR_COMMANDES] = prod;
-		Files_FIFO[0][NBR_COMMANDES] = prod;
-		NBR_COMMANDES++;
-		NBR_PRODUITS = NBR_PRODUITS + prod;
+		tabCommandes[nbrCommandes] = prod;
+		prod1[nbrCommandes] = prod;
+		nbrCommandes++;
+		nbrProduits = nbrProduits + prod;
 		prod = (int) U(1, 7);
+	}
+
+	if (POLITIQUE_COMANDES == 1) {
+		// Politique STP
+		for (int i = 0; i<=nbrCommandes-1; i++) {
+			pos = i;
+			for (int j=i+1; j<=nbrCommandes; j++) {
+				if (tabCommandes[j] < tabCommandes[pos]) {
+					pos = j;
+				}
+			}
+			save = tabCommandes[pos];
+			tabCommandes[pos] = tabCommandes[i];
+			tabCommandes[i] = save;
+		}
+	} else if (POLITIQUE_COMANDES == 2) {
+		// Politique LTP
+		for (int i = 0; i <= nbrCommandes - 1; i++)
+		{
+			pos = i;
+			for (int j = i + 1; j <= nbrCommandes; j++)
+			{
+				if (tabCommandes[j] > tabCommandes[pos])
+				{
+					pos = j;
+				}
+			}
+			save = tabCommandes[pos];
+			tabCommandes[pos] = tabCommandes[i];
+			tabCommandes[i] = save;
+		}
 	}
 }
 
@@ -214,7 +255,7 @@ void initialisation()
 	// Variables de simulation
 	t = 0;
 	H = HORIZON;
-	NBR_EVENT = 0;
+	nbrEvent = 0;
 
 	// Tableau des commandes
 	init_commandes();
@@ -234,136 +275,212 @@ void initialisation()
 	state[1][0] = 0;
 	state[1][1] = 0;
 
-	Stock[0] = NBR_COMMANDES;
+	Stock[0] = nbrCommandes;
 	Stock[1] = 0;
 	Stock[2] = 0;
 }
 
+
+void modifications_paramètres() {
+	/*
+	#define STOCK_MAX_PROD1 64
+	#define STOCK_MAX_WAREHOUSE 64
+	#define STOCK_MAX_CLIENT2 64
+	#define HORIZON 5000
+	#define TEMPS_TRAITEMENT_AGV 7
+	#define POLITIQUE_COMANDES 0
+	float H; // horizons de simulation
+	float LAW[2][3][2] = {
+	    {{15, 1}, {15, 1}, {25, 1}}, {{15, 1}, {15, 1}, {25, 1}}};
+	*/
+	printf("\nTaille de Prod1 : ");
+	scanf("%d", &STOCK_MAX_PROD1);
+	printf("Taille de Warehouse : ");
+	scanf("%d", &STOCK_MAX_WAREHOUSE);
+	printf("Taille de Client2 : ");
+	scanf("%d", &STOCK_MAX_CLIENT2);
+	printf("Horizon : ");
+	scanf("%d", &HORIZON);
+	printf("Politique des commandes (0: aucune, 1: STP, 2: LTP): ");
+	scanf("%d", &POLITIQUE_COMANDES);
+
+	printf("Temps de traitement des AGVs : ");
+	scanf("%d", &TEMPS_TRAITEMENT_AGV);
+	printf("\n\n--- AGV 1 ---");
+	printf("\nTemps de chargement:");
+	printf("\nMoyenne :");
+	scanf("%f", &LAW[0][0][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[0][0][1]);
+	printf("Temps de dechargement:");
+	printf("\nMoyenne :");
+	scanf("%f", &LAW[0][1][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[0][1][1]);
+	printf("Temps de deplacement:");
+	printf("\nMoyenne :");
+	scanf("%f", &LAW[0][2][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[0][2][1]);
+	printf("\n--- AGV 2 ---");
+	printf("\nTemps de chargement:");
+	printf("\nMoyenne :");
+	scanf("%f", &LAW[1][0][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[1][0][1]);
+	printf("Temps de dechargement:");
+	printf("\nMoyenne :");
+	scanf("%f", &LAW[1][1][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[1][1][1]);
+	printf("Temps de deplacement:");
+	printf("Moyenne :");
+	scanf("%f", &LAW[1][2][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[1][2][1]);
+	printf("\n");
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Évènements //
 /**************************************************************/
 void fin_chargement(int agv)
 {
 	int i;
-	if (agv == 1)
+	if (agv == 1) // L'AGV 1 finit de charger, il est en Prod1
 	{
-		state[0][1] = Files_FIFO[0][0];
-		for (i = 0; i <= Stock[0] - 2; i++)
+		state[0][1] = prod1[0]; // Met la charge de AGV1 à celle de de la commande chargée
+		for (i = 0; i <= Stock[0] - 2; i++) // Retire la commande de Prod1
 		{
-			Files_FIFO[0][i] = Files_FIFO[0][i + 1];
+			prod1[i] = prod1[i + 1];
 		}
-		Stock[0]--;
-		state[0][0] = 3;
+		Stock[0]--; // Réduit le nombre de commande de Prod1
+		state[0][0] = 3; // Met l'AGV1 en chagement
 		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][2]), 1, 2);
+		// Ajoute une fin de déplacement de AGV1 vers Warehouse
 	}
-	else
+	else // L'AGV 2 finit de charger il est en Warehouse
 	{
-		state[1][1] = Files_FIFO[1][0];
-		for (i = 0; i <= Stock[1] - 2; i++)
+		state[1][1] = warehouse[0]; // Met le chargement de AGV2 à celui de la cimmande chargée
+		for (i = 0; i <= Stock[1] - 2; i++) // Enlève la commande de Warehouse
 		{
-			Files_FIFO[1][i] = Files_FIFO[1][i + 1];
+			warehouse[i] = warehouse[i + 1];
 		}
-		Stock[1]--;
-		state[1][0] = 3;
+		Stock[1]--; // Réduit le nombre de commande de Warehouse
+		state[1][0] = 3; // AGV2 en déplacement
 		ajouter(3, t + N(LAW[1][2][0], LAW[1][2][1]), 2, 3);
-		if (state[0][0] == 0 && state[0][1] != 0)
+		// Ajoute un déplacement de AGV2 vers Client2
+		if (state[0][0] == 0 && state[0][1] != 0) // Vérifie si AGV1 est en attente
 		{
-			state[0][0] = 1;
-			ajouter(2, t + N(LAW[0][1][0] * state[0][1], LAW[0][1][1]), 1, 0);
+			// Si oui
+			state[0][0] = 1; // AGV1 en chargement
+			ajouter(
+					2,
+					t + N(LAW[0][1][0] * state[0][1], LAW[0][1][1])+TEMPS_TRAITEMENT_AGV,
+					1, 0
+			);	
+			// Ajoute une fin de chargmeent de AGV1
 		}
 	}
 }
 
 void fin_dechargement(int agv)
 {
-	if (agv == 1)
+	if (agv == 1) // Le déchargment concerne AGV1
 	{
-		Files_FIFO[1][Stock[1]] = state[0][1];
-		Stock[1]++;
-		state[0][1] = 0;
-		state[0][0] = 3;
-		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]), 1, 1);
-		if (state[1][0] == 0)
+		warehouse[Stock[1]] = state[0][1]; // Ajoute la commande dans warehouse
+		Stock[1]++; // Augmente le nbr de commandes dans Warehouse
+		state[0][1] = 0; // Charge de AGV1 à 0
+		state[0][0] = 3; // AGV1 en déplacement
+		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]), 1, 1); // Ajoute une fin de déplacement
+		if (state[1][0] == 0) // Vérifie si AGV2 était en attente
 		{
 			state[1][0] = 2;
-			ajouter(1, t + N(LAW[1][0][0]*Files_FIFO[1][0], LAW[1][0][1]), 2, 0);
+			ajouter(1, t + N(LAW[1][0][0]*warehouse[0], LAW[1][0][1]) + TEMPS_TRAITEMENT_AGV, 2, 0);
+			// Ajoute une fin de chargement de AGV2
 		}
 	}
-	else
+	else // déchargement concenre AGV2
 	{
-		Files_FIFO[2][Stock[2]] = state[1][1];
-		Stock[2]++;
-		state[1][1] = 0;
-		state[1][0] = 3;
+		client2[Stock[2]] = state[1][1]; // Ajoute la commande à Client2
+		Stock[2]++; // Augmente le nombre de commandde dans Client 2
+		state[1][1] = 0; // Charge AGV2 à 0
+		state[1][0] = 3; // AGV2 en déplacement
 		ajouter(3, t + N(LAW[1][2][0], LAW[1][2][1]), 2, 2);
+		// Ajoute une fin de déplacement de AGV2 vers Warehouse
 	}
 }
 
 void fin_deplacement(int agv, int lieu)
 {
-	if (agv == 1)
+	if (agv == 1) // L'évènement concerne AGV1
 	{
-		if (lieu == 1)
+		if (lieu == 1) // Déplacement en Prod1
 		{
-			if (Stock[0] >= 1)
+			if (Stock[0] >= 1) // Si il y a des commandes en Prod1
 			{
 				state[0][0] = 2;
-				ajouter(1, t + N(LAW[0][1][0]*Files_FIFO[0][0], LAW[0][1][1]), 1, 0);
+				ajouter(1, t + N(LAW[0][1][0]*client2[0], LAW[0][1][1]) + TEMPS_TRAITEMENT_AGV, 1, 0);
 			}
-			else
+			else // Sinon en attente
 			{
 				state[0][0] = 0;
 				ajouter(1, 2 * H, 1, 1);
 			}
 		}
-		else
+		else // Déplacement vers Warehouse
 		{
-			if (state[1][0] == 2)
+			if (state[1][0] == 2) // Si AGV2 décharge
 			{
-				state[0][0] = 0;
+				state[0][0] = 0; // AGV1 en attente
 			}
-			else
+			else // Sinon décharge
 			{
 				state[0][0] = 1;
-				ajouter(2, t + N(LAW[0][0][0] * state[0][1], LAW[0][0][1]), 1, 0);
+				ajouter(2, t + N(LAW[0][0][0] * state[0][1], LAW[0][0][1]) + TEMPS_TRAITEMENT_AGV, 1, 0);
 			}
 		}
 	}
-	else
+	else // Déplacement concerne AGV2
 	{
-		if (lieu == 2)
+		if (lieu == 2) // Vers Warehouse
 		{
-			if (state[0][0] == 2)
+			if (state[0][0] == 2) // si AGV1 est en déchargement
 			{
-				state[1][0] = 0;
+				state[1][0] = 0; // AGV2 en attente
 			}
 			else
 			{
-				if (Stock[1] >= 1)
+				if (Stock[1] >= 1) // Si il y a des commandes en Warehouse
 				{
+					// AGV2 en chargement
 					state[1][0] = 2;
-					ajouter(1, t + N(LAW[1][0][0] * Files_FIFO[1][0], LAW[1][0][1]), 2, 0);
+					ajouter(1, t + N(LAW[1][0][0] * warehouse[0], LAW[1][0][1]) + TEMPS_TRAITEMENT_AGV, 2, 0);
 				}
 				else
 				{
+					// AGV2 en attente
 					state[1][0] = 0;
 				}
 			}
 		}
-		else
+		else // Déplacement vers Client 2
 		{
-			state[1][0] = 1;
-			ajouter(2, t + N(LAW[1][1][0] * state[1][1], LAW[1][1][1]), 2, 0);
+			// Déchargmeent de AGV2
+			state[1][0] = 1; 
+			ajouter(2, t + N(LAW[1][1][0] * state[1][1], LAW[1][1][1]) + TEMPS_TRAITEMENT_AGV, 2, 0);
 		}
 	}
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Fonctions d'affichages */
 /**************************************************************/
 void show_commandes()
 {
-	for (int i = 0; i < NBR_COMMANDES; i++)
+	for (int i = 0; i < nbrCommandes; i++)
 	{
-		printf("Commande %d: %d produits\n", i + 1, TAB_COMMANDES[i]);
+		printf("Commande %d: %d produits\n", i + 1, tabCommandes[i]);
 	}
 }
 
@@ -460,16 +577,16 @@ void afficher_commandes()
 	printf("\n#       Liste des commandes      #");
 	printf("\n#                                #");
 	printf("\n##################################"); //34 #
-	for (int i=0; i<NBR_COMMANDES; i++)
+	for (int i=0; i<nbrCommandes; i++)
 	{
 		printf(
 			"\nCommande %d, produits: %d",
-			i + 1, TAB_COMMANDES[i]
+			i + 1, tabCommandes[i]
 		);
 	}
 	printf(
 		"\nTotal commandes: %d\nTotal produits: %d\n",
-		NBR_COMMANDES, NBR_PRODUITS
+		nbrCommandes, nbrProduits
 	);
 }
 
@@ -508,6 +625,7 @@ void afficher_parametres_simu()
 	);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Algorithme principale //
 /**************************************************************/
 int algo_principal(int verbose)
@@ -517,7 +635,7 @@ int algo_principal(int verbose)
 	// initialisation();
 	system("clear");
 	printf("\n--- Debut de simulation ---\n\n");
-	while (t < H && Stock[2] < NBR_COMMANDES)
+	while (t < H && Stock[2] < nbrCommandes)
 	{
 		ev = Tab[0][0];
 		t = Tab[1][0];
@@ -527,6 +645,7 @@ int algo_principal(int verbose)
 		{ // Affiches l'état du système
 			printf("\n--- Nouveau cycle --- \n");
 			show_state();
+			sleep(1.2);
 		}
 		deletion();
 		if (ev == 1) // Sélectionne l'évènement
@@ -611,9 +730,10 @@ void menu()
 			fflush(stdin);
 			scanf(">>%d", &wait);
 		} else if (choix == 4) {
-			// R
+			init = 0;
+			modifications_paramètres();
 			fflush(stdin);
-			scanf("%d", &wait);
+			scanf(">>%d", &wait);
 		} else if (choix == 5) {
 			afficher_parametres_simu();
 			fflush(stdin);
@@ -651,6 +771,20 @@ int main(int argc, char *argv[])
 		printf("\n --- Dev ---\n\n");
 		initialisation();
 		algo_principal(1);
+		return 0;
+	}
+	else if (strcmp(argv[1], "-m") == 0)
+	{
+		// Lance en mode dev pour avoir
+		// toutes les infos de simulation
+		printf("SALUT MAEL");
+		return 0;
+	}
+	else if (strcmp(argv[1], "-i") == 0)
+	{
+		// Lance en mode dev pour avoir
+		// toutes les infos de simulation
+		printf("SALUT IRIS");
 		return 0;
 	}
 	else
