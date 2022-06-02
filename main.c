@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <unistd.h>
 
 /****************************************************************
  * Ce projet a pour objectif de simuler le système industriel de Sy15
@@ -13,13 +14,14 @@
 #define STOCK_MAX_PROD1 64
 #define STOCK_MAX_WAREHOUSE 64
 #define STOCK_MAX_CLIENT2 64
-#define HORIZON 3000
+#define HORIZON 5000
 #define TAILLE_ECHEANCIER 2
 // En réalité on pourait utiliser 2 mais avec un
 // échéancier on peut facilement ajouter des évènements
 #define TEMPS_TRAITEMENT_AGV 7
 // Avant de commencer une opération les agvs ont un temps de
 // traitement d'environ 7 secondes à chaques fois
+#define POLITIQUE_COMANDES 0
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Variables globales */
@@ -29,7 +31,8 @@ float t; // Temps courant
 float H; // horizons de simulation
 
 // Les Loi de la simulation
-float LAW[2][3][2] = {{{10, 0.1}, {10, 0.1}, {10, 0.1}}, {{10, 0.1}, {10, 0.1}, {10, 0.1}}};
+float LAW[2][3][2] = {
+    {{15, 1}, {15, 1}, {25, 1}}, {{15, 1}, {15, 1}, {25, 1}}};
 // Les lois sont organisé comme suit:
 // AGV1
 // 		Chargement
@@ -48,9 +51,9 @@ float LAW[2][3][2] = {{{10, 0.1}, {10, 0.1}, {10, 0.1}}, {{10, 0.1}, {10, 0.1}, 
 // il faut utiliser LAW[0][2][1]
 
 // Tableau des commandes à t=0;
-int TAB_COMMANDES[STOCK_MAX_PROD1];
-int NBR_COMMANDES; // Nombre total de commande après génération
-int NBR_PRODUITS; // Nombre total de produit après génération
+int tabCommandes[STOCK_MAX_PROD1];
+int nbrCommandes; // Nombre total de commande après génération
+int nbrProduits; // Nombre total de produit après génération
 
 int Stock[3];
 // Donne le nombre de commandes dans chaques zones de stockage
@@ -184,7 +187,7 @@ void deletion()
 void init_commandes()
 {
 	// L'objectif de cette fonction est de générer le tableau
-	// de commandes TAB_COMMANDES.
+	// de commandes tabCommandes.
 	// Ce tableau est un vecteur remplit avec le nombre de
 	// commandes et le nombre de produit en FIFO
 	// Le nombre max de produits et 64.
@@ -197,17 +200,49 @@ void init_commandes()
 		U(0, 1);
 	}
 
-	int compt = 0;
+	// int compt = 0;
 	int prod = (int) U(1, 7);
-	NBR_COMMANDES = 0;
-	NBR_PRODUITS = 0;
-	while (NBR_PRODUITS + prod < STOCK_MAX_PROD1)
+	int pos, save;
+	nbrCommandes = 0;
+	nbrProduits = 0;
+	while (nbrProduits + prod < STOCK_MAX_PROD1)
 	{
-		TAB_COMMANDES[NBR_COMMANDES] = prod;
-		prod1[NBR_COMMANDES] = prod;
-		NBR_COMMANDES++;
-		NBR_PRODUITS = NBR_PRODUITS + prod;
+		tabCommandes[nbrCommandes] = prod;
+		prod1[nbrCommandes] = prod;
+		nbrCommandes++;
+		nbrProduits = nbrProduits + prod;
 		prod = (int) U(1, 7);
+	}
+
+	if (POLITIQUE_COMANDES == 1) {
+		// Politique STP
+		for (int i = 0; i<=nbrCommandes-1; i++) {
+			pos = i;
+			for (int j=i+1; j<=nbrCommandes; j++) {
+				if (tabCommandes[j] < tabCommandes[pos]) {
+					pos = j;
+				}
+			}
+			save = tabCommandes[pos];
+			tabCommandes[pos] = tabCommandes[i];
+			tabCommandes[i] = save;
+		}
+	} else if (POLITIQUE_COMANDES == 2) {
+		// Politique LTP
+		for (int i = 0; i <= nbrCommandes - 1; i++)
+		{
+			pos = i;
+			for (int j = i + 1; j <= nbrCommandes; j++)
+			{
+				if (tabCommandes[j] > tabCommandes[pos])
+				{
+					pos = j;
+				}
+			}
+			save = tabCommandes[pos];
+			tabCommandes[pos] = tabCommandes[i];
+			tabCommandes[i] = save;
+		}
 	}
 }
 
@@ -239,7 +274,7 @@ void initialisation()
 	state[1][0] = 0;
 	state[1][1] = 0;
 
-	Stock[0] = NBR_COMMANDES;
+	Stock[0] = nbrCommandes;
 	Stock[1] = 0;
 	Stock[2] = 0;
 }
@@ -381,9 +416,9 @@ void fin_deplacement(int agv, int lieu)
 /**************************************************************/
 void show_commandes()
 {
-	for (int i = 0; i < NBR_COMMANDES; i++)
+	for (int i = 0; i < nbrCommandes; i++)
 	{
-		printf("Commande %d: %d produits\n", i + 1, TAB_COMMANDES[i]);
+		printf("Commande %d: %d produits\n", i + 1, tabCommandes[i]);
 	}
 }
 
@@ -480,16 +515,16 @@ void afficher_commandes()
 	printf("\n#       Liste des commandes      #");
 	printf("\n#                                #");
 	printf("\n##################################"); //34 #
-	for (int i=0; i<NBR_COMMANDES; i++)
+	for (int i=0; i<nbrCommandes; i++)
 	{
 		printf(
 			"\nCommande %d, produits: %d",
-			i + 1, TAB_COMMANDES[i]
+			i + 1, tabCommandes[i]
 		);
 	}
 	printf(
 		"\nTotal commandes: %d\nTotal produits: %d\n",
-		NBR_COMMANDES, NBR_PRODUITS
+		nbrCommandes, nbrProduits
 	);
 }
 
@@ -538,7 +573,7 @@ int algo_principal(int verbose)
 	// initialisation();
 	system("clear");
 	printf("\n--- Debut de simulation ---\n\n");
-	while (t < H && Stock[2] < NBR_COMMANDES)
+	while (t < H && Stock[2] < nbrCommandes)
 	{
 		ev = Tab[0][0];
 		t = Tab[1][0];
@@ -548,6 +583,7 @@ int algo_principal(int verbose)
 		{ // Affiches l'état du système
 			printf("\n--- Nouveau cycle --- \n");
 			show_state();
+			sleep(1.2);
 		}
 		deletion();
 		if (ev == 1) // Sélectionne l'évènement
