@@ -8,20 +8,21 @@
  * Ce projet a pour objectif de simuler le système industriel de Sy15
  * Voir le README.md pour plus d'informations
  * *************************************************************/
-
+// Paramètres fixes
+#define TAILLE_ECHEANCIER 2
+#define MAX_ARRAY_SIZE 1000
 // Paramètres de simulation //
 /**************************************************************/
-#define STOCK_MAX_PROD1 64
-#define STOCK_MAX_WAREHOUSE 64
-#define STOCK_MAX_CLIENT2 64
-#define HORIZON 5000
-#define TAILLE_ECHEANCIER 2
+int STOCK_MAX_PROD1 = 64;
+int STOCK_MAX_WAREHOUSE = 64;
+int STOCK_MAX_CLIENT2 = 64;
+int HORIZON = 5000;
 // En réalité on pourait utiliser 2 mais avec un
 // échéancier on peut facilement ajouter des évènements
-#define TEMPS_TRAITEMENT_AGV 7
+int TEMPS_TRAITEMENT_AGV = 7;
 // Avant de commencer une opération les agvs ont un temps de
 // traitement d'environ 7 secondes à chaques fois
-#define POLITIQUE_COMANDES 0
+int POLITIQUE_COMANDES = 0;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /* Variables globales */
@@ -51,7 +52,7 @@ float LAW[2][3][2] = {
 // il faut utiliser LAW[0][2][1]
 
 // Tableau des commandes à t=0;
-int tabCommandes[STOCK_MAX_PROD1];
+int tabCommandes[MAX_ARRAY_SIZE];
 int nbrCommandes; // Nombre total de commande après génération
 int nbrProduits; // Nombre total de produit après génération
 
@@ -59,7 +60,7 @@ int Stock[3];
 // Donne le nombre de commandes dans chaques zones de stockage
 // 0: Prod1, 1: Warehouse, 2: Client2
 
-int NBR_EVENT;
+int nbrEvent;
 float Tab[4][TAILLE_ECHEANCIER];
 // L'échéancier:
 // Evenement
@@ -82,9 +83,9 @@ int state[2][2];
 // Par exemple pour utiliser l'état actuel de AGV2 il faut utiliser
 // state[1][0]
 
-int prod1[STOCK_MAX_PROD1];
-int warehouse[STOCK_MAX_PROD1];
-int client2[STOCK_MAX_PROD1];
+int prod1[MAX_ARRAY_SIZE];
+int warehouse[MAX_ARRAY_SIZE];
+int client2[MAX_ARRAY_SIZE];
 // Les commandes des files
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -130,7 +131,7 @@ float N(float M, float O)
 void ajouter(int event, float date, int agv, int lieu)
 {
 	// Ajoute l'évènement dans l'échéancier
-	if (NBR_EVENT == 0)
+	if (nbrEvent == 0)
 	{
 		// L'évènement 0 n'existe que lorsque l'échéancier est
 		// initialisé, donc c'est une vérification pour les
@@ -164,7 +165,7 @@ void ajouter(int event, float date, int agv, int lieu)
 		Tab[2][pos] = agv;
 		Tab[3][pos] = lieu;
 	}
-	NBR_EVENT++;
+	nbrEvent++;
 }
 
 void deletion()
@@ -181,7 +182,7 @@ void deletion()
 	Tab[1][TAILLE_ECHEANCIER - 1] = 0;
 	Tab[2][TAILLE_ECHEANCIER - 1] = 0;
 	Tab[3][TAILLE_ECHEANCIER - 1] = 0;
-	NBR_EVENT--;
+	nbrEvent--;
 }
 
 void init_commandes()
@@ -254,7 +255,7 @@ void initialisation()
 	// Variables de simulation
 	t = 0;
 	H = HORIZON;
-	NBR_EVENT = 0;
+	nbrEvent = 0;
 
 	// Tableau des commandes
 	init_commandes();
@@ -277,6 +278,67 @@ void initialisation()
 	Stock[0] = nbrCommandes;
 	Stock[1] = 0;
 	Stock[2] = 0;
+}
+
+
+void modifications_paramètres() {
+	/*
+	#define STOCK_MAX_PROD1 64
+	#define STOCK_MAX_WAREHOUSE 64
+	#define STOCK_MAX_CLIENT2 64
+	#define HORIZON 5000
+	#define TEMPS_TRAITEMENT_AGV 7
+	#define POLITIQUE_COMANDES 0
+	float H; // horizons de simulation
+	float LAW[2][3][2] = {
+	    {{15, 1}, {15, 1}, {25, 1}}, {{15, 1}, {15, 1}, {25, 1}}};
+	*/
+	printf("\nTaille de Prod1 : ");
+	scanf("%d", &STOCK_MAX_PROD1);
+	printf("Taille de Warehouse : ");
+	scanf("%d", &STOCK_MAX_WAREHOUSE);
+	printf("Taille de Client2 : ");
+	scanf("%d", &STOCK_MAX_CLIENT2);
+	printf("Horizon : ");
+	scanf("%d", &HORIZON);
+	printf("Politique des commandes (0: aucune, 1: STP, 2: LTP): ");
+	scanf("%d", &POLITIQUE_COMANDES);
+
+	printf("Temps de traitement des AGVs : ");
+	scanf("%d", &TEMPS_TRAITEMENT_AGV);
+	printf("\n\n--- AGV 1 ---");
+	printf("\nTemps de chargement:");
+	printf("\nMoyenne :");
+	scanf("%f", &LAW[0][0][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[0][0][1]);
+	printf("Temps de dechargement:");
+	printf("\nMoyenne :");
+	scanf("%f", &LAW[0][1][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[0][1][1]);
+	printf("Temps de deplacement:");
+	printf("\nMoyenne :");
+	scanf("%f", &LAW[0][2][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[0][2][1]);
+	printf("\n--- AGV 2 ---");
+	printf("\nTemps de chargement:");
+	printf("\nMoyenne :");
+	scanf("%f", &LAW[1][0][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[1][0][1]);
+	printf("Temps de dechargement:");
+	printf("\nMoyenne :");
+	scanf("%f", &LAW[1][1][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[1][1][1]);
+	printf("Temps de deplacement:");
+	printf("Moyenne :");
+	scanf("%f", &LAW[1][2][0]);
+	printf("Ecart-type :");
+	scanf("%f", &LAW[1][2][1]);
+	printf("\n");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -668,9 +730,10 @@ void menu()
 			fflush(stdin);
 			scanf(">>%d", &wait);
 		} else if (choix == 4) {
-			// R
+			init = 0;
+			modifications_paramètres();
 			fflush(stdin);
-			scanf("%d", &wait);
+			scanf(">>%d", &wait);
 		} else if (choix == 5) {
 			afficher_parametres_simu();
 			fflush(stdin);
@@ -708,6 +771,20 @@ int main(int argc, char *argv[])
 		printf("\n --- Dev ---\n\n");
 		initialisation();
 		algo_principal(1);
+		return 0;
+	}
+	else if (strcmp(argv[1], "-m") == 0)
+	{
+		// Lance en mode dev pour avoir
+		// toutes les infos de simulation
+		printf("SALUT MAEL");
+		return 0;
+	}
+	else if (strcmp(argv[1], "-i") == 0)
+	{
+		// Lance en mode dev pour avoir
+		// toutes les infos de simulation
+		printf("SALUT IRIS");
 		return 0;
 	}
 	else
