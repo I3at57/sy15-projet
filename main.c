@@ -8,9 +8,11 @@
  * Ce projet a pour objectif de simuler le système industriel de Sy15
  * Voir le README.md pour plus d'informations
  * *************************************************************/
+
 // Paramètres fixes
 #define TAILLE_ECHEANCIER 2
 #define MAX_ARRAY_SIZE 1000
+
 // Paramètres de simulation //
 /**************************************************************/
 int STOCK_MAX_PROD1 = 64;
@@ -30,6 +32,8 @@ int POLITIQUE_COMANDES = 0;
 // Variables de simulations
 float t; // Temps courant
 float H; // horizons de simulation
+int maxWarehouse; // Nbr max de produit dans Warehouse atteint
+
 
 // Les Loi de la simulation
 float LAW[2][3][2] = {
@@ -92,17 +96,26 @@ int client2[MAX_ARRAY_SIZE];
 /* Fonctions de probabilités */
 /**************************************************************/
 int X0 = 1; // Pour U(A,B)
+int ALPHA = 15;
+int BETA = 7;
+int GAMMA = 15654;
 float U(float A, float B)
 {
 	// retourne une valeur aléatoire uniformément
 	// répartie entre A et B, des réels
-	int alpha = 15;
-    int beta = 7;
-    int gamma = 15654;
-
-    X0 = (alpha*X0+beta)%(gamma);
-    float val = (float) X0/gamma;
+    X0 = (ALPHA*X0+BETA)%(GAMMA);
+    float val = (float) X0/GAMMA;
     return (float) val*(B-A)+A;
+}
+
+void enter_seed() {
+	printf("\nALPHA :");
+	scanf("%d", &ALPHA);
+	printf("BETA :");
+	scanf("%d", &BETA);
+	printf("GAMMA :");
+	scanf("%d", &GAMMA);
+	printf("\n");
 }
 
 float Exp(float lambda)
@@ -256,6 +269,7 @@ void initialisation()
 	t = 0;
 	H = HORIZON;
 	nbrEvent = 0;
+	maxWarehouse = 0;
 
 	// Tableau des commandes
 	init_commandes();
@@ -282,17 +296,6 @@ void initialisation()
 
 
 void modifications_parametres() {
-	/*
-	#define STOCK_MAX_PROD1 64
-	#define STOCK_MAX_WAREHOUSE 64
-	#define STOCK_MAX_CLIENT2 64
-	#define HORIZON 5000
-	#define TEMPS_TRAITEMENT_AGV 7
-	#define POLITIQUE_COMANDES 0
-	float H; // horizons de simulation
-	float LAW[2][3][2] = {
-	    {{15, 1}, {15, 1}, {25, 1}}, {{15, 1}, {15, 1}, {25, 1}}};
-	*/
 	printf("\nTaille de Prod1 : ");
 	scanf("%d", &STOCK_MAX_PROD1);
 	printf("Taille de Warehouse : ");
@@ -390,6 +393,7 @@ void fin_dechargement(int agv)
 	{
 		warehouse[Stock[1]] = state[0][1]; // Ajoute la commande dans warehouse
 		Stock[1]++; // Augmente le nbr de commandes dans Warehouse
+		if (Stock[1] > maxWarehouse){maxWarehouse=Stock[1];} // Augmente Stock Max
 		state[0][1] = 0; // Charge de AGV1 à 0
 		state[0][0] = 3; // AGV1 en déplacement
 		ajouter(3, t + N(LAW[0][2][0], LAW[0][2][1]), 1, 1); // Ajoute une fin de déplacement
@@ -562,7 +566,8 @@ void start_display()
 		"\n# 4. Modifier parametres         #"
 		"\n# 5. Voir parametres simulation  #"
 	 	"\n# 6. Voir les commandes          #"
-	 	"\n# 7. Quitter                     #"
+	 	"\n# 7. Changer graine aleatoire    #"
+	 	"\n# 8. Quitter                     #"
 		"\n#                                #"
 		"\n##################################"
 
@@ -633,8 +638,8 @@ int algo_principal(int verbose)
 	t = 0; // reinitialise le temps pour plusieurs simulations
 	int ev, agv, lieu, i, j;
 	// initialisation();
-	system("clear");
-	printf("\n--- Debut de simulation ---\n\n");
+	//system("clear");
+	printf("\n--- Debut de simulation ---\n");
 	while (t < H && Stock[2] < nbrCommandes)
 	{
 		ev = Tab[0][0];
@@ -645,7 +650,7 @@ int algo_principal(int verbose)
 		{ // Affiches l'état du système
 			printf("\n--- Nouveau cycle --- \n");
 			show_state();
-			sleep(1.2);
+			sleep(1);
 		}
 		deletion();
 		if (ev == 1) // Sélectionne l'évènement
@@ -662,8 +667,9 @@ int algo_principal(int verbose)
 		}
 	}
 
-	printf("\n--- Fin de simulation ---\n\n");
+	printf("--- Fin de simulation ---\n");
 	printf("Temps de simulation: %f\n", t);
+	printf("Stock Max atteint dans Warehouse: %d\n", maxWarehouse);
 
 	return 0;
 }
@@ -685,7 +691,7 @@ void menu()
 	int init=0; // A t=0 la simu n'est pas initialise
 	system("clear"); //allow to clear the cmd
 	start_display(); // Affiche l'écran d'acceuil
-	while (choix != 7)
+	while (choix != 8)
 	{
 		scanf("%d", &choix);
 		if (choix == 1)
@@ -742,6 +748,12 @@ void menu()
 			afficher_commandes();	
 			fflush(stdin);
 			scanf(">>%d", &wait);
+		} else if (choix == 7) {
+			init = 0;
+			enter_seed();
+			printf("Salut !\n");
+			fflush(stdin);
+			scanf(">>%d", &wait);
 		}
 		system("clear");
 		start_display();
@@ -766,11 +778,27 @@ int main(int argc, char *argv[])
 	}
 	else if (strcmp(argv[1], "-d") == 0)
 	{
-		// Lance en mode dev pour avoir
-		// toutes les infos de simulation
-		printf("\n --- Dev ---\n\n");
+		// Lance la simulation en mode simple
+		initialisation();
+		algo_principal(0);
+		return 0;
+	}
+	else if (strcmp(argv[1], "-v") == 0)
+	{
+		// Lance la simulation en mode verbatim
 		initialisation();
 		algo_principal(1);
+		return 0;
+	}
+	else if (strcmp(argv[1], "-s") == 0)
+	{
+		// Lance la simulation en mode verbatim
+		for (int i=0; i<30; i++){
+			initialisation();
+			algo_principal(0);
+		}
+		initialisation();
+		algo_principal(0);
 		return 0;
 	}
 	else if (strcmp(argv[1], "-m") == 0)
@@ -778,13 +806,6 @@ int main(int argc, char *argv[])
 		// Lance en mode dev pour avoir
 		// toutes les infos de simulation
 		printf("SALUT MAEL");
-		return 0;
-	}
-	else if (strcmp(argv[1], "-i") == 0)
-	{
-		// Lance en mode dev pour avoir
-		// toutes les infos de simulation
-		printf("SALUT IRIS");
 		return 0;
 	}
 	else
