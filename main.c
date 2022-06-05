@@ -281,7 +281,7 @@ void initialisation()
 }
 
 
-void modifications_paramètres() {
+void modifications_parametres() {
 	/*
 	#define STOCK_MAX_PROD1 64
 	#define STOCK_MAX_WAREHOUSE 64
@@ -731,7 +731,7 @@ void menu()
 			scanf(">>%d", &wait);
 		} else if (choix == 4) {
 			init = 0;
-			modifications_paramètres();
+			modifications_parametres();
 			fflush(stdin);
 			scanf(">>%d", &wait);
 		} else if (choix == 5) {
